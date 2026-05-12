@@ -21,6 +21,9 @@ void newRecord(FILE *fPtr);
 void deleteRecord(FILE *fPtr);
 void searchRecord(FILE *fPtr);
 void createCreditFile(FILE **cfPtr);
+void displayAllRecords(FILE *fPtr);
+void showAccountBalance(FILE *fPtr);
+void displayAllAccountsTrans(FILE *fPtr);
 
 // create a fresh credit.dat file with blank records
 void createCreditFile(FILE **cfPtr)
@@ -71,7 +74,7 @@ int main(int argc, char *argv[])
     }
 
     // enable user to specify action
-    while ((choice = enterChoice()) != 6)
+    while ((choice = enterChoice()) != 9)
     {
         switch (choice)
         {
@@ -94,6 +97,18 @@ int main(int argc, char *argv[])
         // search record
         case 5:
             searchRecord(cfPtr);
+            break;
+        // display all records
+        case 6:
+            displayAllRecords(cfPtr);
+            break;
+        // show account balance
+        case 7:
+            showAccountBalance(cfPtr);
+            break;
+        // display all accounts and transaction counts
+        case 8:
+            displayAllAccountsTrans(cfPtr);
             break;
         // display if user does not select valid choice
         default:
@@ -219,6 +234,7 @@ void deleteRecord(FILE *fPtr)
 // search and display record
 void searchRecord(FILE *fPtr)
 {
+    FILE *writePtr; // accounts.txt file pointer
     unsigned int account; // account number
     // create clientData with no information
     struct clientData client = {0, "", "", 0.0, 0};
@@ -235,13 +251,36 @@ void searchRecord(FILE *fPtr)
     if (client.acctNum == 0)
     {
         printf("Account #%d has no information.\n", account);
+
+        writePtr = fopen("accounts.txt", "w");
+        if (writePtr == NULL)
+        {
+            puts("File could not be opened.");
+        }
+        else
+        {
+            fprintf(writePtr, "Account #%d has no information.\n", account);
+            fclose(writePtr);
+            puts("accounts.txt has been updated with the search result.");
+        }
     }
     else
     { // display record
+        printf("%-6s%-16s%-11s%10s%10s\n", "Acct", "Last Name", "First Name", "Balance", "Trans Count");
         printf("%-6d%-16s%-11s%10.2f%10u\n", client.acctNum, client.lastName, client.firstName, client.balance, client.transCount);
 
-        textFile(fPtr);
-        puts("accounts.txt has been refreshed.");
+        writePtr = fopen("accounts.txt", "w");
+        if (writePtr == NULL)
+        {
+            puts("File could not be opened.");
+        }
+        else
+        {
+            fprintf(writePtr, "%-6s%-16s%-11s%10s%10s\n", "Acct", "Last Name", "First Name", "Balance", "Trans Count");
+            fprintf(writePtr, "%-6d%-16s%-11s%10.2f%10u\n", client.acctNum, client.lastName, client.firstName, client.balance, client.transCount);
+            fclose(writePtr);
+            puts("accounts.txt has been updated with the search result.");
+        }
     }
 } // end function searchRecord
 
@@ -282,6 +321,157 @@ void newRecord(FILE *fPtr)
     } // end else
 } // end function newRecord
 
+// display all records to console
+void displayAllRecords(FILE *fPtr)
+{
+    FILE *writePtr; // accounts.txt file pointer
+    int result; // used to test whether fread read any bytes
+    // create clientData with default information
+    struct clientData client = {0, "", "", 0.0, 0};
+
+    // fopen opens the file; exits if file cannot be opened
+    if ((writePtr = fopen("accounts.txt", "w")) == NULL)
+    {
+        puts("File could not be opened.");
+    } // end if
+    else
+    {
+        rewind(fPtr); // sets pointer to beginning of file
+        fprintf(writePtr, "%-6s%-16s%-11s%10s%10s\n", "Acct", "Last Name", "First Name", "Balance", "Trans Count");
+
+        // copy all records from random-access file into text file
+        while (!feof(fPtr))
+        {
+            result = fread(&client, sizeof(struct clientData), 1, fPtr);
+
+            // write single record to text file
+            if (result != 0 && client.acctNum != 0)
+            {
+                fprintf(writePtr, "%-6d%-16s%-11s%10.2f%10u\n", client.acctNum, client.lastName, client.firstName,
+                        client.balance, client.transCount);
+            } // end if
+        }     // end while
+
+        fclose(writePtr); // fclose closes the file
+    }                     // end else
+
+    // Now display to console
+    rewind(fPtr);
+    printf("%-6s%-16s%-11s%10s%10s\n", "Acct", "Last Name", "First Name", "Balance", "Trans Count");
+
+    while (!feof(fPtr))
+    {
+        result = fread(&client, sizeof(struct clientData), 1, fPtr);
+
+        if (result != 0 && client.acctNum != 0)
+        {
+            printf("%-6d%-16s%-11s%10.2f%10u\n", client.acctNum, client.lastName, client.firstName,
+                   client.balance, client.transCount);
+        }
+    }
+
+    puts("accounts.txt has been updated with all records.");
+} // end function displayAllRecords
+
+// show account balance
+void showAccountBalance(FILE *fPtr)
+{
+    FILE *writePtr; // accounts.txt file pointer
+    unsigned int account; // account number
+    // create clientData with no information
+    struct clientData client = {0, "", "", 0.0, 0};
+
+    // obtain number of account to show balance
+    printf("%s", "Enter account to show balance ( 1 - 100 ): ");
+    scanf("%u", &account);
+
+    // move file pointer to correct record in file
+    fseek(fPtr, (long)(account - 1) * sizeof(struct clientData), SEEK_SET);
+    // read record from file
+    fread(&client, sizeof(struct clientData), 1, fPtr);
+    // display error if account does not exist
+    if (client.acctNum == 0)
+    {
+        printf("Account #%d has no information.\n", account);
+        // Write to file
+        if ((writePtr = fopen("accounts.txt", "w")) == NULL)
+        {
+            puts("File could not be opened.");
+        }
+        else
+        {
+            fprintf(writePtr, "Account #%d has no information.\n", account);
+            fclose(writePtr);
+        }
+    }
+    else
+    { // display balance
+        printf("Account #%d balance: %.2f\n", client.acctNum, client.balance);
+        // Write to file
+        if ((writePtr = fopen("accounts.txt", "w")) == NULL)
+        {
+            puts("File could not be opened.");
+        }
+        else
+        {
+            fprintf(writePtr, "Account #%d balance: %.2f\n", client.acctNum, client.balance);
+            fclose(writePtr);
+        }
+    }
+
+    puts("accounts.txt has been updated with the balance.");
+} // end function showAccountBalance
+
+// display all accounts and transaction counts
+void displayAllAccountsTrans(FILE *fPtr)
+{
+    FILE *writePtr; // accounts.txt file pointer
+    int result; // used to test whether fread read any bytes
+    // create clientData with default information
+    struct clientData client = {0, "", "", 0.0, 0};
+
+    // fopen opens the file; exits if file cannot be opened
+    if ((writePtr = fopen("accounts.txt", "w")) == NULL)
+    {
+        puts("File could not be opened.");
+    } // end if
+    else
+    {
+        rewind(fPtr); // sets pointer to beginning of file
+        fprintf(writePtr, "%-6s%10s\n", "Acct", "Trans Count");
+
+        // copy all records from random-access file into text file
+        while (!feof(fPtr))
+        {
+            result = fread(&client, sizeof(struct clientData), 1, fPtr);
+
+            // write single record to text file
+            if (result != 0 && client.acctNum != 0)
+            {
+                fprintf(writePtr, "%-6d%10u\n", client.acctNum, client.transCount);
+            } // end if
+        }     // end while
+
+        fclose(writePtr); // fclose closes the file
+    }                     // end else
+
+    // Now display to console
+    rewind(fPtr);
+    printf("%-6s%10s\n", "Acct", "Trans Count");
+
+    while (!feof(fPtr))
+    {
+        result = fread(&client, sizeof(struct clientData), 1, fPtr);
+
+        if (result != 0 && client.acctNum != 0)
+        {
+            printf("%-6d%10u\n", client.acctNum, client.transCount);
+        }
+    }
+
+    puts("accounts.txt has been updated with accounts and transaction counts.");
+} // end function displayAllAccountsTrans
+
 // enable user to input menu choice
 unsigned int enterChoice(void)
 {
@@ -294,7 +484,10 @@ unsigned int enterChoice(void)
                  "3 - add a new account\n"
                  "4 - delete an account\n"
                  "5 - search an account\n"
-                 "6 - end program\n? ");
+                 "6 - display all records\n"
+                 "7 - show account balance\n"
+                 "8 - display all accounts and transaction counts\n"
+                 "9 - end program\n? ");
 
     scanf("%u", &menuChoice); // receive choice from user
     return menuChoice;
